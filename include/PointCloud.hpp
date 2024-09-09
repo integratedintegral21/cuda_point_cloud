@@ -19,8 +19,10 @@ struct PointCoord {
 template <typename ...ScalarTs>
 class CudaPointCloud {
  private:
+
   typedef std::tuple<ScalarTs...> ScalarsT;
   constexpr static bool HAS_SCALARS_ = sizeof...(ScalarTs) > 0;
+  std::vector<size_t> scalar_sizes_;
 
  public:
   explicit CudaPointCloud(const std::vector<PointCoord> &point_data) requires (!HAS_SCALARS_);
@@ -29,13 +31,23 @@ class CudaPointCloud {
 
   ~CudaPointCloud();
 
+  // Getters
+  [[nodiscard]] size_t Size() const {
+    return pcl_size_;
+  }
+
+  [[nodiscard]] std::vector<size_t> ScalarSizes() const {
+    return scalar_sizes_;
+  }
+
  private:
+  size_t pcl_size_ = 0;
   void *xyz_ptr_ = nullptr;
   void *scalar_ptr_ = nullptr;
 
   // Helpers
   void InitPoints(const std::vector<PointCoord> &point_data);
-  void InitScalars(const std::vector<ScalarsT> &scalar_data);
+  void InitScalars(const std::vector<ScalarsT> &scalar_data) requires HAS_SCALARS_;
   void cudaThrowIfStatusNotOk(cudaError_t e);
 };
 
