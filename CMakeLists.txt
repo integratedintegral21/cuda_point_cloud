@@ -3,10 +3,22 @@ set(CMAKE_CUDA_ARCHITECTURES "native")
 set(CMAKE_CUDA_COMPILER /usr/local/cuda/bin/nvcc)
 project(cuda_point_cloud CUDA CXX)
 
+enable_testing()
 set(CMAKE_CXX_STANDARD 20)
 
+find_package(GTest REQUIRED)
+
 add_library(cuda_point_cloud SHARED
-        src/PointCloud.cpp
+        src/PointCloud.cu
 )
 target_include_directories(cuda_point_cloud PUBLIC include)
 set_target_properties(cuda_point_cloud PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+
+# Unit tests
+add_executable(cuda_point_cloud_test
+        test/cuda_point_cloud_test.cpp)
+target_include_directories(cuda_point_cloud_test PUBLIC include)
+target_link_libraries(cuda_point_cloud_test GTest::gtest_main)
+
+include(GoogleTest)
+gtest_add_tests(TARGET cuda_point_cloud_test)
