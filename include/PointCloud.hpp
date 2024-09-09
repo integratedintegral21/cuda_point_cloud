@@ -40,6 +40,14 @@ class CudaPointCloud {
     return scalar_sizes_;
   }
 
+  [[nodiscard]] PointCoord* PointCoordDevPtr() const {
+    return reinterpret_cast<PointCoord*>(xyz_ptr_);
+  }
+
+  [[nodiscard]] void* ScalarDevPtr() const {
+    return scalar_ptr_;
+  }
+
  private:
   size_t pcl_size_ = 0;
   void *xyz_ptr_ = nullptr;

@@ -6,15 +6,15 @@
 
 namespace cuda_point_cloud {
 
-template<size_t I, size_t N, typename... ScalarTs>
+template<size_t I, typename... ScalarTs>
 void fill_buff(char *buf, const std::tuple<ScalarTs...> &scalar) {
-  if constexpr (I == N) {
+  if constexpr (I == sizeof...(ScalarTs)) {
     return;
   } else {
     auto elem = std::get<I>(scalar);
-    auto casted_buf = (decltype(elem)*)(buf);
+    auto casted_buf = reinterpret_cast<decltype(elem)*>(buf);
     *casted_buf = elem;
-    fill_buff<I + 1, N, ScalarTs...>((char*)(casted_buf + 1), scalar);
+    fill_buff<I + 1, ScalarTs...>((char*)(casted_buf + 1), scalar);
   }
 }
 
@@ -80,7 +80,7 @@ requires HAS_SCALARS_{
   for (int i = 0; i < pcl_size; i++) {
     char *buf_start = host_buf + i * stride;
     auto scalar = scalar_data[i];
-    fill_buff<0, sizeof...(ScalarTs), ScalarTs...>(buf_start, scalar);
+    fill_buff<0, ScalarTs...>(buf_start, scalar);
   }
 
   cudaThrowIfStatusNotOk(cudaMemcpy(scalar_ptr_, host_buf, mem_size, cudaMemcpyHostToDevice));
