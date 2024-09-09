@@ -26,6 +26,7 @@ struct PointCloudFixture: ::testing::Test {
 
 TEST_F(PointCloudFixture, ConstructorTest) {
   ASSERT_NO_THROW(CudaPointCloudXYZ p(xyz));
+  ASSERT_NO_THROW(CudaPointCloudXYZ p({}));
 }
 
 int main(int argc, char **argv)

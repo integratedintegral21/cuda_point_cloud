@@ -7,7 +7,9 @@ namespace cuda_point_cloud {
 template<typename... ScalarTs>
 CudaPointCloud<ScalarTs...>::CudaPointCloud(
     const std::vector<PointCoord> &point_data) requires (!HAS_SCALARS_) {
-  InitPoints(point_data);
+  if (!point_data.empty()) {
+    InitPoints(point_data);
+  }
 }
 
 template<typename... ScalarTs>
@@ -17,7 +19,10 @@ CudaPointCloud<ScalarTs...>::CudaPointCloud(
   if (point_data.size() != scalar_data.size()) {
     throw std::invalid_argument("Point data length different from scalar data length");
   }
-  InitPoints(point_data);
+
+  if (!point_data.empty()) {
+    InitPoints(point_data);
+  }
 }
 
 template<typename... ScalarTs>
