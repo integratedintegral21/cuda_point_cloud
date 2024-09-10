@@ -48,11 +48,11 @@ class CudaPointCloud {
     return reinterpret_cast<const PointCoord*>(xyz_ptr_);
   }
 
-  [[nodiscard]] void* ScalarDevPtr() {
+  [[nodiscard]] void* ScalarDevPtr() requires HAS_SCALARS_ {
     return scalar_ptr_;
   }
 
-  [[nodiscard]] const void* ScalarDevPtr() const {
+  [[nodiscard]] const void* ScalarDevPtr() const requires HAS_SCALARS_ {
     return scalar_ptr_;
   }
 
@@ -66,7 +66,7 @@ class CudaPointCloud {
    * A bit slow, use for debugging only
    * @return
    */
-  [[nodiscard]] std::vector<ScalarsT> GetHostScalars() const;
+  [[nodiscard]] std::vector<ScalarsT> GetHostScalars() const requires HAS_SCALARS_;
 
  private:
   size_t pcl_size_ = 0;

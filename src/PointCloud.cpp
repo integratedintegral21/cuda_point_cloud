@@ -23,6 +23,23 @@ void fill_buff(char *buf, const std::tuple<ScalarTs...> &scalar) {
   fill_buff<0, ScalarTs...>(buf, scalar);
 }
 
+template<size_t I, typename ...ScalarTs>
+void fill_tuple(char *buf, std::tuple<ScalarTs...> &tuple) {
+  if constexpr (I == sizeof...(ScalarTs)) {
+    return;
+  } else {
+    typedef std::remove_reference_t<decltype(std::get<I>(tuple))> elemT;
+    auto casted_buf = reinterpret_cast<elemT*>(buf);
+    std::get<I>(tuple) = *casted_buf;
+    fill_tuple<I + 1, ScalarTs...>(reinterpret_cast<char *>(casted_buf + 1), tuple);
+  }
+}
+
+template<typename ...ScalarTs>
+void fill_tuple(char *buf, std::tuple<ScalarTs...> &tuple) {
+  fill_tuple<0, ScalarTs...>(buf, tuple);
+}
+
 template<typename... ScalarTs>
 CudaPointCloud<ScalarTs...>::CudaPointCloud(
     const std::vector<PointCoord> &point_data) requires (!HAS_SCALARS_) {
@@ -58,6 +75,25 @@ std::vector<PointCoord> CudaPointCloud<ScalarTs...>::GetHostPoints() const {
   cudaThrowIfStatusNotOk(cudaMemcpy(host_pts.data(), xyz_ptr_, mem_required,
                                     cudaMemcpyDeviceToHost));
   return host_pts;
+}
+
+template<typename... ScalarTs>
+std::vector<std::tuple<ScalarTs...>> CudaPointCloud<ScalarTs...>::GetHostScalars() const
+requires HAS_SCALARS_ {
+  size_t row_size = std::reduce(scalar_sizes_.begin(), scalar_sizes_.end());
+  std::vector<std::tuple<ScalarTs...>> scalars;
+
+  std::vector<char> host_buf(row_size);
+  for (size_t i = 0; i < pcl_size_; i++) {
+    void *scalar_dev_ptr = reinterpret_cast<char *>(scalar_ptr_) + i * row_size;
+    cudaThrowIfStatusNotOk(cudaMemcpy(host_buf.data(), scalar_dev_ptr, row_size,
+                                      cudaMemcpyDeviceToHost));
+    std::tuple<ScalarTs...> scalar;
+    fill_tuple<ScalarTs...>(host_buf.data(), scalar);
+    scalars.push_back(scalar);
+  }
+
+  return scalars;
 }
 
 template<typename... ScalarTs>
@@ -105,7 +141,7 @@ requires HAS_SCALARS_{
 template<typename... ScalarTs>
 void CudaPointCloud<ScalarTs...>::cudaThrowIfStatusNotOk(cudaError_t e) const {
   if (e) {
-    throw std::runtime_error(cudaGetErrorString(e));
+    throw std::runtime_error(std::string("CUDA error: ") + cudaGetErrorString(e));
   }
 }
 
