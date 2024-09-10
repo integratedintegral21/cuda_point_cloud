@@ -40,13 +40,33 @@ class CudaPointCloud {
     return scalar_sizes_;
   }
 
-  [[nodiscard]] PointCoord* PointCoordDevPtr() const {
+  [[nodiscard]] PointCoord* PointCoordDevPtr() {
     return reinterpret_cast<PointCoord*>(xyz_ptr_);
   }
 
-  [[nodiscard]] void* ScalarDevPtr() const {
+  [[nodiscard]] const PointCoord* PointCoordDevPtr() const {
+    return reinterpret_cast<const PointCoord*>(xyz_ptr_);
+  }
+
+  [[nodiscard]] void* ScalarDevPtr() {
     return scalar_ptr_;
   }
+
+  [[nodiscard]] const void* ScalarDevPtr() const {
+    return scalar_ptr_;
+  }
+
+  /**
+   * A bit slow, use for debugging only
+   * @return
+   */
+  [[nodiscard]] std::vector<PointCoord> GetHostPoints() const;
+
+  /**
+   * A bit slow, use for debugging only
+   * @return
+   */
+  [[nodiscard]] std::vector<ScalarsT> GetHostScalars() const;
 
  private:
   size_t pcl_size_ = 0;
@@ -56,20 +76,13 @@ class CudaPointCloud {
   // Helpers
   void InitPoints(const std::vector<PointCoord> &point_data);
   void InitScalars(const std::vector<ScalarsT> &scalar_data) requires HAS_SCALARS_;
-  void cudaThrowIfStatusNotOk(cudaError_t e);
+  void cudaThrowIfStatusNotOk(cudaError_t e) const;
 };
 
 typedef CudaPointCloud<> CudaPointCloudXYZ;
-INSTANTIATE_CUDA_POINT_CLOUD()
-
 typedef CudaPointCloud<float> CudaPointCloudXYZI;
-INSTANTIATE_CUDA_POINT_CLOUD(float)
-
 typedef CudaPointCloud<uint8_t, uint8_t, uint8_t> CudaPointCloudXYZRGB;
-INSTANTIATE_CUDA_POINT_CLOUD(uint8_t, uint8_t, uint8_t)
-
 typedef CudaPointCloud<float, float, float> CudaPointCloudXYZRGBFloat;
-INSTANTIATE_CUDA_POINT_CLOUD(float, float, float)
 
 }  // namespace cuda_point_cloud
 

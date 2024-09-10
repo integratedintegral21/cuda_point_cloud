@@ -19,6 +19,11 @@ void fill_buff(char *buf, const std::tuple<ScalarTs...> &scalar) {
 }
 
 template<typename... ScalarTs>
+void fill_buff(char *buf, const std::tuple<ScalarTs...> &scalar) {
+  fill_buff<0, ScalarTs...>(buf, scalar);
+}
+
+template<typename... ScalarTs>
 CudaPointCloud<ScalarTs...>::CudaPointCloud(
     const std::vector<PointCoord> &point_data) requires (!HAS_SCALARS_) {
   pcl_size_ = point_data.size();
@@ -44,6 +49,15 @@ CudaPointCloud<ScalarTs...>::CudaPointCloud(
     InitPoints(point_data);
     InitScalars(scalar_data);
   }
+}
+
+template<typename... ScalarTs>
+std::vector<PointCoord> CudaPointCloud<ScalarTs...>::GetHostPoints() const {
+  std::vector<PointCoord> host_pts(pcl_size_);
+  size_t mem_required = pcl_size_ * sizeof(PointCoord);
+  cudaThrowIfStatusNotOk(cudaMemcpy(host_pts.data(), xyz_ptr_, mem_required,
+                                    cudaMemcpyDeviceToHost));
+  return host_pts;
 }
 
 template<typename... ScalarTs>
@@ -80,7 +94,7 @@ requires HAS_SCALARS_{
   for (int i = 0; i < pcl_size; i++) {
     char *buf_start = host_buf + i * stride;
     auto scalar = scalar_data[i];
-    fill_buff<0, ScalarTs...>(buf_start, scalar);
+    fill_buff<ScalarTs...>(buf_start, scalar);
   }
 
   cudaThrowIfStatusNotOk(cudaMemcpy(scalar_ptr_, host_buf, mem_size, cudaMemcpyHostToDevice));
@@ -89,10 +103,15 @@ requires HAS_SCALARS_{
 }
 
 template<typename... ScalarTs>
-void CudaPointCloud<ScalarTs...>::cudaThrowIfStatusNotOk(cudaError_t e) {
+void CudaPointCloud<ScalarTs...>::cudaThrowIfStatusNotOk(cudaError_t e) const {
   if (e) {
     throw std::runtime_error(cudaGetErrorString(e));
   }
 }
+
+INSTANTIATE_CUDA_POINT_CLOUD()
+INSTANTIATE_CUDA_POINT_CLOUD(float)
+INSTANTIATE_CUDA_POINT_CLOUD(uint8_t, uint8_t, uint8_t)
+INSTANTIATE_CUDA_POINT_CLOUD(float, float, float)
 
 }  // namespace cuda_point_cloud

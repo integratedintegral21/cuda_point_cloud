@@ -1,3 +1,5 @@
+#include <numeric>
+
 #include <gtest/gtest.h>
 
 #include "PointCloud.hpp"
@@ -50,6 +52,57 @@ TEST_F(PointCloudFixture, ConstructorTest) {
   auto scalar_sizes = pcl_rgb.ScalarSizes();
   for (size_t i = 0; i < 3; i++) {
     ASSERT_EQ(scalar_sizes[i], 1);
+  }
+
+  // Make sure points are set correctly
+  PointCoord *test_xyz_dev = pcl_rgb.PointCoordDevPtr();
+  size_t pcl_size = pcl_rgb.Size();
+  size_t mem_required = pcl_size * sizeof(PointCoord);
+  std::vector<PointCoord> test_xyz(pcl_size);
+
+  if (auto status = cudaMemcpy(test_xyz.data(), test_xyz_dev, mem_required, cudaMemcpyDeviceToHost)) {
+    FAIL();
+  }
+
+  for (size_t i = 0; i < pcl_size; i++) {
+    const auto pt = test_xyz[i];
+    const auto ref_pt = xyz[i];
+    ASSERT_EQ(pt.x, ref_pt.x);
+    ASSERT_EQ(pt.y, ref_pt.y);
+    ASSERT_EQ(pt.z, ref_pt.z);
+  }
+
+  // Check scalars as well
+  char *test_rgb_dev = (char *)pcl_rgb.ScalarDevPtr();
+  mem_required = pcl_size * std::reduce(scalar_sizes.begin(), scalar_sizes.end());
+  std::vector<char> test_rgb(mem_required);  // A byte-array
+  if (auto status = cudaMemcpy(test_rgb.data(), test_rgb_dev, mem_required, cudaMemcpyDeviceToHost)) {
+    FAIL();
+  }
+
+  for (size_t i = 0; i < pcl_size; i++) {
+    auto r = static_cast<uint8_t>(test_rgb[3 * i]);
+    auto g = static_cast<uint8_t>(test_rgb[3 * i + 1]);
+    auto b = static_cast<uint8_t>(test_rgb[3 * i + 2]);
+    auto ref_r = std::get<0>(rgb[i]);
+    auto ref_g = std::get<1>(rgb[i]);
+    auto ref_b = std::get<2>(rgb[i]);
+    ASSERT_EQ(r, ref_r);
+    ASSERT_EQ(g, ref_g);
+    ASSERT_EQ(b, ref_b);
+  }
+}
+
+TEST_F(PointCloudFixture, HostGettersTest) {
+  CudaPointCloudXYZRGB pcl_rgb(xyz, rgb);
+
+  auto host_xyz = pcl_rgb.GetHostPoints();
+  size_t pcl_size = pcl_rgb.Size();
+  for (size_t i = 0; i < pcl_size; i++) {
+    const auto &pt = xyz[i];
+    ASSERT_EQ(pt.x, xyz[i].x);
+    ASSERT_EQ(pt.y, xyz[i].y);
+    ASSERT_EQ(pt.z, xyz[i].z);
   }
 }
 
