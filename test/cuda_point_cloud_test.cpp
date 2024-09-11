@@ -38,14 +38,14 @@ struct PointCloudFixture: ::testing::Test {
 TEST_F(PointCloudFixture, ConstructorTest) {
   ASSERT_NO_THROW(CudaPointCloudXYZ p(xyz));
   ASSERT_NO_THROW(CudaPointCloudXYZRGB p(xyz, rgb));
-  ASSERT_NO_THROW(CudaPointCloudXYZ p({}));
+  ASSERT_NO_THROW(CudaPointCloudXYZ p);
   ASSERT_NO_THROW(CudaPointCloudXYZRGB p({}, {}));
   ASSERT_THROW(CudaPointCloudXYZRGB p(xyz, {{0, 0, 0}, {1, 1, 1}}), std::invalid_argument);
 
   CudaPointCloudXYZ pcl(xyz);
   ASSERT_EQ(pcl.Size(), xyz.size());
 
-  CudaPointCloudXYZ empty_pcl({});
+  CudaPointCloudXYZ empty_pcl;
   ASSERT_EQ(empty_pcl.Size(), 0);
 
   CudaPointCloudXYZRGB pcl_rgb(xyz, rgb);
@@ -139,6 +139,20 @@ TEST_F(PointCloudFixture, ResizeTest) {
     ASSERT_EQ(g, std::get<1>(rgb[i]));
     ASSERT_EQ(b, std::get<2>(rgb[i]));
   }
+
+  CudaPointCloudXYZRGB empty_pcl;
+  empty_pcl.resize(5);
+
+  ASSERT_EQ(empty_pcl.Size(), 5);
+  ASSERT_EQ(empty_pcl.GetHostPoints().size(), 5);
+  ASSERT_EQ(empty_pcl.GetHostScalars().size(), 5);
+  ASSERT_NE(empty_pcl.PointCoordDevPtr(), nullptr);
+  ASSERT_NE(empty_pcl.ScalarDevPtr(), nullptr);
+}
+
+TEST_F(PointCloudFixture, TransformTest) {
+  CudaPointCloudXYZRGB pcl_rgb(xyz, rgb);
+  CudaPointCloudXYZRGB pcl_rgb_out;
 }
 
 int main(int argc, char **argv)

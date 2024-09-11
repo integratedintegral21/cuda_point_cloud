@@ -24,6 +24,7 @@ class CudaPointCloud {
   std::vector<size_t> scalar_sizes_;
 
  public:
+  CudaPointCloud();
   explicit CudaPointCloud(const std::vector<PointCoord> &point_data) requires (!HAS_SCALARS_);
   CudaPointCloud(const std::vector<PointCoord> &point_data,
                  const std::vector<ScalarsT> &scalar_data) requires HAS_SCALARS_;
@@ -79,6 +80,11 @@ class CudaPointCloud {
   void InitScalars(const std::vector<ScalarsT> &scalar_data) requires HAS_SCALARS_;
   void cudaThrowIfStatusNotOk(cudaError_t e) const;
 };
+
+template<typename... ScalarTs>
+CudaPointCloud<ScalarTs...>::CudaPointCloud() {
+  scalar_sizes_ = {sizeof(ScalarTs)...};
+}
 
 typedef CudaPointCloud<> CudaPointCloudXYZ;
 typedef CudaPointCloud<float> CudaPointCloudXYZI;

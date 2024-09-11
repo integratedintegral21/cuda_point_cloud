@@ -57,6 +57,7 @@ CudaPointCloud<ScalarTs...>::CudaPointCloud(
     const std::vector<PointCoord> &point_data,
     const std::vector<ScalarsT> &scalar_data) requires HAS_SCALARS_ {
   if (point_data.size() != scalar_data.size()) {
+    scalar_sizes_ = {sizeof(ScalarTs)...};
     throw std::invalid_argument("Point data length different from scalar data length");
   }
 
@@ -98,6 +99,12 @@ requires HAS_SCALARS_ {
 
 template<typename... ScalarTs>
 void CudaPointCloud<ScalarTs...>::resize(size_t n) {
+  if (pcl_size_ == 0) {  // No need to copy old data, just allocate
+    cudaThrowIfStatusNotOk(cudaMalloc(reinterpret_cast<void **>(&xyz_ptr_),
+                                      n * sizeof(PointCoord)));
+    cudaThrowIfStatusNotOk(cudaMalloc(&scalar_ptr_, n * std::reduce(scalar_sizes_.begin(),
+                                                                    scalar_sizes_.end())));
+  }
   PointCoord *xyz_copy;
   size_t new_n_bytes = n * sizeof(PointCoord);
   size_t curr_n_bytes = pcl_size_ * sizeof(PointCoord);

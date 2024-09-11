@@ -11,8 +11,6 @@ void transform_point_cloud(const CudaPointCloud<ScalarTs...> &in_pcl,
   if (in_pcl.Size() == 0) {
     return;
   }
-
-
 }
 
 
