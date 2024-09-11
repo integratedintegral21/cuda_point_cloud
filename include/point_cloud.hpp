@@ -56,7 +56,7 @@ class CudaPointCloud {
     return scalar_ptr_;
   }
 
-  void resize(size_t n);
+  void Resize(size_t n);
 
   /**
    * A bit slow, use for debugging only
@@ -78,7 +78,6 @@ class CudaPointCloud {
   // Helpers
   void InitPoints(const std::vector<PointCoord> &point_data);
   void InitScalars(const std::vector<ScalarsT> &scalar_data) requires HAS_SCALARS_;
-  void cudaThrowIfStatusNotOk(cudaError_t e) const;
 };
 
 template<typename... ScalarTs>

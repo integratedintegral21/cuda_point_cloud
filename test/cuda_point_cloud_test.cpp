@@ -1,8 +1,12 @@
 #include <numeric>
 
+#include <Eigen/Core>
+#include <Eigen/Dense>
+
 #include <gtest/gtest.h>
 
 #include "point_cloud.hpp"
+#include "transform.hpp"
 
 using namespace cuda_point_cloud;
 
@@ -119,7 +123,7 @@ TEST_F(PointCloudFixture, HostGettersTest) {
 TEST_F(PointCloudFixture, ResizeTest) {
   CudaPointCloudXYZRGB pcl_rgb(xyz, rgb);
 
-  pcl_rgb.resize(3);
+  pcl_rgb.Resize(3);
   ASSERT_EQ(pcl_rgb.Size(), 3);
 
   size_t pcl_size = pcl_rgb.Size();
@@ -141,18 +145,119 @@ TEST_F(PointCloudFixture, ResizeTest) {
   }
 
   CudaPointCloudXYZRGB empty_pcl;
-  empty_pcl.resize(5);
+  empty_pcl.Resize(5);
 
   ASSERT_EQ(empty_pcl.Size(), 5);
   ASSERT_EQ(empty_pcl.GetHostPoints().size(), 5);
   ASSERT_EQ(empty_pcl.GetHostScalars().size(), 5);
   ASSERT_NE(empty_pcl.PointCoordDevPtr(), nullptr);
   ASSERT_NE(empty_pcl.ScalarDevPtr(), nullptr);
+
+  // Set data
+  pcl_size = empty_pcl.Size();
+  size_t n_bytes_to_copy = pcl_size * sizeof(PointCoord);
+  if (cudaMemcpy(empty_pcl.PointCoordDevPtr(), xyz.data(), n_bytes_to_copy, cudaMemcpyHostToDevice)) {
+    FAIL();
+  }
+  host_xyz = empty_pcl.GetHostPoints();
+  for (size_t i = 0; i < pcl_size; i++) {
+    ASSERT_EQ(host_xyz[i].x, xyz[i].x);
+  }
+
+  // now check scalars
+  n_bytes_to_copy = pcl_size * 3;
+  std::vector<unsigned char> rgb_buf(n_bytes_to_copy);
+  for (size_t i = 0; i < pcl_size; i++) {
+    rgb_buf[3 * i] = std::get<0>(rgb[i]);
+    rgb_buf[3 * i + 1] = std::get<1>(rgb[i]);
+    rgb_buf[3 * i + 2] = std::get<2>(rgb[i]);
+  }
+  if (cudaMemcpy(empty_pcl.ScalarDevPtr(), rgb_buf.data(), n_bytes_to_copy, cudaMemcpyHostToDevice)) {
+    FAIL();
+  }
+  host_rgb = empty_pcl.GetHostScalars();
+  ASSERT_EQ(host_rgb.size(), pcl_size);
+  for (size_t i = 0; i < pcl_size; i++) {
+    ASSERT_EQ(host_rgb[i], rgb[i]);
+  }
 }
 
 TEST_F(PointCloudFixture, TransformTest) {
   CudaPointCloudXYZRGB pcl_rgb(xyz, rgb);
   CudaPointCloudXYZRGB pcl_rgb_out;
+  Eigen::Matrix<float, 3, 4> identity;
+  identity << 1, 0, 0, 0,
+              0, 1, 0, 0,
+              0, 0, 1, 0;
+
+  transformPointCloud(pcl_rgb, pcl_rgb_out, identity);
+
+  auto transformed_xyz = pcl_rgb_out.GetHostPoints();
+  size_t pcl_size = pcl_rgb_out.Size();
+  ASSERT_EQ(pcl_size, pcl_rgb.Size());
+  for (size_t i = 0; i < pcl_size; i++) {
+    ASSERT_EQ(transformed_xyz[i].x, xyz[i].x);
+    ASSERT_EQ(transformed_xyz[i].y, xyz[i].y);
+    ASSERT_EQ(transformed_xyz[i].z, xyz[i].z);
+  }
+
+  std::vector<PointCoord> xyz_big;
+  pcl_size = 1 << 21;
+  for (size_t i = 0; i < pcl_size; i++) {
+    float x = 2048. / pcl_size * i;
+    float y = 1024. / pcl_size * i + 200;
+    float z = 2048. / pcl_size * i - 5000;
+    xyz_big.push_back({x, y, z});
+  }
+
+  CudaPointCloudXYZ pcl_big(xyz_big);
+  CudaPointCloudXYZ pcl_big_out;
+
+  transformPointCloud(pcl_big, pcl_big_out, identity);
+  transformed_xyz = pcl_big_out.GetHostPoints();
+  for (size_t i = 0; i < pcl_size; i++) {
+    ASSERT_EQ(transformed_xyz[i].x, xyz_big[i].x);
+    ASSERT_EQ(transformed_xyz[i].y, xyz_big[i].y);
+    ASSERT_EQ(transformed_xyz[i].z, xyz_big[i].z);
+  }
+
+  Eigen::Matrix<float, 3, 4> translation_only;
+  translation_only << 1, 0, 0, 21.5,
+                      0, 1, 0, -24.1,
+                      0, 0, 1, 33.3;
+
+  transformPointCloud(pcl_big, pcl_big_out, translation_only);
+  transformed_xyz = pcl_big_out.GetHostPoints();
+  for (size_t i = 0; i < pcl_size; i++) {
+    ASSERT_NEAR(transformed_xyz[i].x, xyz_big[i].x + 21.5, 0.01);
+    ASSERT_NEAR(transformed_xyz[i].y, xyz_big[i].y - 24.1, 0.01);
+    ASSERT_NEAR(transformed_xyz[i].z, xyz_big[i].z + 33.3, 0.01);
+  }
+}
+
+TEST_F(PointCloudFixture, LargeTransform) {
+  size_t pcl_size = 1 << 25;
+  std::vector<PointCoord> xyz;
+  for (size_t i = 0; i < pcl_size; i++) {
+    float x = 2048. / pcl_size * i;
+    float y = 1024. / pcl_size * i + 200;
+    float z = 2048. / pcl_size * i - 5000;
+    xyz.push_back({x, y, z});
+  }
+
+  CudaPointCloudXYZ pcl(xyz);
+  CudaPointCloudXYZ pcl_out;
+  Eigen::Matrix<float, 3, 4> transform;
+  transform << 0, 1, 0, 21.5,
+               0, 0, 1, -24.1,
+               1, 0, 0, 33.3;
+  transformPointCloud(pcl, pcl_out, transform);
+  auto transformed_xyz = pcl_out.GetHostPoints();
+  for (size_t i = 0; i < pcl_size; i++) {
+    ASSERT_NEAR(transformed_xyz[i].x, xyz[i].y + 21.5, 0.01);
+    ASSERT_NEAR(transformed_xyz[i].y, xyz[i].z - 24.1, 0.01);
+    ASSERT_NEAR(transformed_xyz[i].z, xyz[i].x + 33.3, 0.01);
+  }
 }
 
 int main(int argc, char **argv)

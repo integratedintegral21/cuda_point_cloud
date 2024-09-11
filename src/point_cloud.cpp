@@ -2,7 +2,8 @@
 
 #include <numeric>
 #include <stdexcept>
-#include "iostream"
+
+#include "utils.hpp"
 
 namespace cuda_point_cloud {
 
@@ -46,9 +47,6 @@ CudaPointCloud<ScalarTs...>::CudaPointCloud(
   pcl_size_ = point_data.size();
   if (!point_data.empty()) {
     InitPoints(point_data);
-  }
-  for (size_t size: scalar_sizes_) {
-    std::cout << size << std::endl;
   }
 }
 
@@ -98,7 +96,7 @@ requires HAS_SCALARS_ {
 }
 
 template<typename... ScalarTs>
-void CudaPointCloud<ScalarTs...>::resize(size_t n) {
+void CudaPointCloud<ScalarTs...>::Resize(size_t n) {
   if (pcl_size_ == 0) {  // No need to copy old data, just allocate
     cudaThrowIfStatusNotOk(cudaMalloc(reinterpret_cast<void **>(&xyz_ptr_),
                                       n * sizeof(PointCoord)));
@@ -179,13 +177,6 @@ requires HAS_SCALARS_{
   cudaThrowIfStatusNotOk(cudaMemcpy(scalar_ptr_, host_buf, mem_size, cudaMemcpyHostToDevice));
 
   free(host_buf);
-}
-
-template<typename... ScalarTs>
-void CudaPointCloud<ScalarTs...>::cudaThrowIfStatusNotOk(cudaError_t e) const {
-  if (e) {
-    throw std::runtime_error(std::string("CUDA error: ") + cudaGetErrorString(e));
-  }
 }
 
 INSTANTIATE_CUDA_POINT_CLOUD()

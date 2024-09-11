@@ -13,7 +13,7 @@ include_directories(${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES} ${EIGEN3_INCLUDE_D
 
 add_library(cuda_point_cloud SHARED
         src/point_cloud.cpp
-        src/transform.cpp
+        src/transform.cu
 )
 
 target_include_directories(cuda_point_cloud PUBLIC
