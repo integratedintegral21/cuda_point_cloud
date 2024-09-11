@@ -7,15 +7,19 @@ enable_testing()
 set(CMAKE_CXX_STANDARD 20)
 
 find_package(GTest REQUIRED)
+find_package(Eigen3 REQUIRED)
+
+include_directories(${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES} ${EIGEN3_INCLUDE_DIRS})
 
 add_library(cuda_point_cloud SHARED
-        src/PointCloud.cpp
+        src/point_cloud.cpp
+        src/transform.cpp
 )
-
-include_directories(${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
 
 target_include_directories(cuda_point_cloud PUBLIC
         include)
+target_link_libraries(cuda_point_cloud PUBLIC
+        Eigen3::Eigen)
 set_target_properties(cuda_point_cloud PROPERTIES CUDA_RUNTIME_LIBRARY Shared
     CUDA_SEPARABLE_COMPILATION ON)
 
@@ -25,6 +29,7 @@ add_executable(cuda_point_cloud_test
 target_include_directories(cuda_point_cloud_test PUBLIC include)
 target_link_libraries(cuda_point_cloud_test GTest::gtest_main cuda_point_cloud
         /usr/local/cuda/lib64/libcudart.so
+        Eigen3::Eigen
 )
 
 include(GoogleTest)

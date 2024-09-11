@@ -1,4 +1,4 @@
-#include "PointCloud.hpp"
+#include "point_cloud.hpp"
 
 #include <numeric>
 #include <stdexcept>
@@ -97,6 +97,42 @@ requires HAS_SCALARS_ {
 }
 
 template<typename... ScalarTs>
+void CudaPointCloud<ScalarTs...>::resize(size_t n) {
+  PointCoord *xyz_copy;
+  size_t new_n_bytes = n * sizeof(PointCoord);
+  size_t curr_n_bytes = pcl_size_ * sizeof(PointCoord);
+  auto n_bytes_to_copy = std::min(curr_n_bytes, new_n_bytes);
+
+  cudaThrowIfStatusNotOk(cudaMalloc(reinterpret_cast<void **>(&xyz_copy), n_bytes_to_copy));
+  cudaThrowIfStatusNotOk(cudaMemcpy(xyz_copy, xyz_ptr_, n_bytes_to_copy, cudaMemcpyDeviceToDevice));
+
+  cudaThrowIfStatusNotOk(cudaFree(xyz_ptr_));
+  cudaMalloc(reinterpret_cast<void **>(&xyz_ptr_), new_n_bytes);
+  cudaThrowIfStatusNotOk(cudaMemcpy(xyz_ptr_, xyz_copy, n_bytes_to_copy, cudaMemcpyDeviceToDevice));
+  cudaThrowIfStatusNotOk(cudaFree(xyz_copy));
+
+  if constexpr (HAS_SCALARS_) {
+    void *scalar_copy;
+    size_t scalar_row_size = std::reduce(scalar_sizes_.begin(), scalar_sizes_.end());
+    new_n_bytes = n * scalar_row_size;
+    curr_n_bytes = pcl_size_ * scalar_row_size;
+    n_bytes_to_copy = std::min(curr_n_bytes, new_n_bytes);
+
+    cudaThrowIfStatusNotOk(cudaMalloc(&scalar_copy, n_bytes_to_copy));
+    cudaThrowIfStatusNotOk(cudaMemcpy(scalar_copy, scalar_ptr_, n_bytes_to_copy,
+                                      cudaMemcpyDeviceToDevice));
+
+    cudaThrowIfStatusNotOk(cudaFree(scalar_ptr_));
+    cudaThrowIfStatusNotOk(cudaMalloc(&scalar_ptr_, new_n_bytes));
+    cudaThrowIfStatusNotOk(cudaMemcpy(scalar_ptr_, scalar_copy, n_bytes_to_copy,
+                                      cudaMemcpyDeviceToDevice));
+    cudaThrowIfStatusNotOk(cudaFree(scalar_copy));
+  }
+
+  pcl_size_ = n;
+}
+
+template<typename... ScalarTs>
 CudaPointCloud<ScalarTs...>::~CudaPointCloud() {
   if (xyz_ptr_) {
     cudaFree(xyz_ptr_);
@@ -110,7 +146,7 @@ template<typename... ScalarTs>
 void CudaPointCloud<ScalarTs...>::InitPoints(const std::vector<PointCoord> &point_data) {
   size_t pcl_size = point_data.size();
   size_t mem_size = pcl_size * sizeof(PointCoord);
-  cudaThrowIfStatusNotOk(cudaMalloc(&xyz_ptr_, mem_size));
+  cudaThrowIfStatusNotOk(cudaMalloc(reinterpret_cast<void **>(&xyz_ptr_), mem_size));
 
   auto xyz_host_ptr_ = point_data.data();
   cudaThrowIfStatusNotOk(cudaMemcpy(xyz_ptr_, xyz_host_ptr_, mem_size, cudaMemcpyHostToDevice));

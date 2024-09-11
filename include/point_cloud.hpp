@@ -1,5 +1,5 @@
-#ifndef CUDA_POINT_CLOUD_POINTCLOUD_HPP
-#define CUDA_POINT_CLOUD_POINTCLOUD_HPP
+#ifndef CUDA_POINT_CLOUD_POINT_CLOUD_HPP
+#define CUDA_POINT_CLOUD_POINT_CLOUD_HPP
 
 #include <vector>
 #include <cstdint>
@@ -19,7 +19,6 @@ struct PointCoord {
 template <typename ...ScalarTs>
 class CudaPointCloud {
  private:
-
   typedef std::tuple<ScalarTs...> ScalarsT;
   constexpr static bool HAS_SCALARS_ = sizeof...(ScalarTs) > 0;
   std::vector<size_t> scalar_sizes_;
@@ -56,6 +55,8 @@ class CudaPointCloud {
     return scalar_ptr_;
   }
 
+  void resize(size_t n);
+
   /**
    * A bit slow, use for debugging only
    * @return
@@ -70,7 +71,7 @@ class CudaPointCloud {
 
  private:
   size_t pcl_size_ = 0;
-  void *xyz_ptr_ = nullptr;
+  PointCoord *xyz_ptr_ = nullptr;
   void *scalar_ptr_ = nullptr;
 
   // Helpers
@@ -86,4 +87,4 @@ typedef CudaPointCloud<float, float, float> CudaPointCloudXYZRGBFloat;
 
 }  // namespace cuda_point_cloud
 
-#endif  // CUDA_POINT_CLOUD_POINTCLOUD_HPP
+#endif  // CUDA_POINT_CLOUD_POINT_CLOUD_HPP

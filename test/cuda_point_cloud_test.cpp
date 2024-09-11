@@ -2,7 +2,7 @@
 
 #include <gtest/gtest.h>
 
-#include "PointCloud.hpp"
+#include "point_cloud.hpp"
 
 using namespace cuda_point_cloud;
 
@@ -99,13 +99,38 @@ TEST_F(PointCloudFixture, HostGettersTest) {
   auto host_xyz = pcl_rgb.GetHostPoints();
   size_t pcl_size = pcl_rgb.Size();
   for (size_t i = 0; i < pcl_size; i++) {
-    const auto &pt = xyz[i];
+    const auto &pt = host_xyz[i];
     ASSERT_EQ(pt.x, xyz[i].x);
     ASSERT_EQ(pt.y, xyz[i].y);
     ASSERT_EQ(pt.z, xyz[i].z);
   }
 
   auto host_rgb = pcl_rgb.GetHostScalars();
+  for (size_t i = 0; i < pcl_size; i++) {
+    auto r = std::get<0>(host_rgb[i]);
+    auto g = std::get<1>(host_rgb[i]);
+    auto b = std::get<2>(host_rgb[i]);
+    ASSERT_EQ(r, std::get<0>(rgb[i]));
+    ASSERT_EQ(g, std::get<1>(rgb[i]));
+    ASSERT_EQ(b, std::get<2>(rgb[i]));
+  }
+}
+
+TEST_F(PointCloudFixture, ResizeTest) {
+  CudaPointCloudXYZRGB pcl_rgb(xyz, rgb);
+
+  pcl_rgb.resize(3);
+  ASSERT_EQ(pcl_rgb.Size(), 3);
+
+  size_t pcl_size = pcl_rgb.Size();
+  auto host_xyz = pcl_rgb.GetHostPoints();
+  auto host_rgb = pcl_rgb.GetHostScalars();
+  for (size_t i = 0; i < pcl_size; i++) {
+    const auto &pt = host_xyz[i];
+    ASSERT_EQ(pt.x, xyz[i].x);
+    ASSERT_EQ(pt.y, xyz[i].y);
+    ASSERT_EQ(pt.z, xyz[i].z);
+  }
   for (size_t i = 0; i < pcl_size; i++) {
     auto r = std::get<0>(host_rgb[i]);
     auto g = std::get<1>(host_rgb[i]);
