@@ -235,7 +235,29 @@ TEST_F(PointCloudFixture, TransformTest) {
   }
 }
 
-TEST_F(PointCloudFixture, LargeTransform) {
+TEST_F(PointCloudFixture, CopyTest) {
+  size_t pcl_size = xyz.size();
+  CudaPointCloudXYZ pcl(xyz);
+  CudaPointCloudXYZRGB pcl_rgb(xyz, rgb);
+
+  CudaPointCloudXYZ pcl_copy(pcl);
+  ASSERT_EQ(pcl_size, pcl_copy.Size());
+  auto copy_xyz = pcl_copy.GetHostPoints();
+  for (size_t i = 0; i < pcl_size; i++) {
+    ASSERT_EQ(copy_xyz[i].x, xyz[i].x);
+    ASSERT_EQ(copy_xyz[i].y, xyz[i].y);
+    ASSERT_EQ(copy_xyz[i].z, xyz[i].z);
+  }
+
+  CudaPointCloudXYZRGB pcl_rgb_copy(pcl_rgb);
+  ASSERT_EQ(pcl_size, pcl_rgb_copy.Size());
+  auto copy_rgb = pcl_rgb_copy.GetHostScalars();
+  for (size_t i = 0; i < pcl_size; i++) {
+    ASSERT_EQ(copy_rgb[i], rgb[i]);
+  }
+}
+
+TEST_F(PointCloudFixture, LargeTransformTest) {
   size_t pcl_size = 1 << 25;
   std::vector<PointCoord> xyz;
   for (size_t i = 0; i < pcl_size; i++) {

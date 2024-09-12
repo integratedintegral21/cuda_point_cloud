@@ -68,6 +68,55 @@ CudaPointCloud<ScalarTs...>::CudaPointCloud(
 }
 
 template<typename... ScalarTs>
+CudaPointCloud<ScalarTs...>::CudaPointCloud(const CudaPointCloud<ScalarTs...> &other) {
+  pcl_size_ = other.pcl_size_;
+  scalar_sizes_ = other.scalar_sizes_;
+
+  size_t mem_required = pcl_size_ * sizeof(PointCoord);
+  cudaThrowIfStatusNotOk(cudaMalloc(reinterpret_cast<void **>(&xyz_ptr_), mem_required));
+  cudaThrowIfStatusNotOk(cudaMemcpy(xyz_ptr_, other.xyz_ptr_, mem_required,
+                                    cudaMemcpyDeviceToDevice));
+
+  if constexpr (HAS_SCALARS_) {
+    mem_required = pcl_size_ * std::reduce(scalar_sizes_.begin(), scalar_sizes_.end());
+    cudaThrowIfStatusNotOk(cudaMalloc(&scalar_ptr_, mem_required));
+    cudaThrowIfStatusNotOk(cudaMemcpy(scalar_ptr_, other.scalar_ptr_, mem_required,
+                                      cudaMemcpyDeviceToDevice));
+  }
+}
+
+template<typename... ScalarTs>
+CudaPointCloud<ScalarTs...> &
+CudaPointCloud<ScalarTs...>::operator=(const CudaPointCloud<ScalarTs...> &other) {
+  if (this == &other) {
+    return *this;
+  }
+  pcl_size_ = other.Size();
+  scalar_sizes_ = other.scalar_sizes_;
+
+  if (xyz_ptr_) {
+    cudaThrowIfStatusNotOk(cudaFree(xyz_ptr_));
+  }
+  size_t mem_required = pcl_size_ * sizeof(PointCoord);
+  cudaThrowIfStatusNotOk(cudaMalloc(reinterpret_cast<void **>(&xyz_ptr_), mem_required));
+  cudaThrowIfStatusNotOk(cudaMemcpy(xyz_ptr_, other.xyz_ptr_, mem_required,
+                                    cudaMemcpyDeviceToDevice));
+
+  if constexpr (HAS_SCALARS_) {
+    if (scalar_ptr_) {
+      cudaThrowIfStatusNotOk(cudaFree(scalar_ptr_));
+    }
+
+    mem_required = pcl_size_ * std::reduce(scalar_sizes_.begin(), scalar_sizes_.end());
+    cudaThrowIfStatusNotOk(cudaMalloc(&scalar_ptr_, mem_required));
+    cudaThrowIfStatusNotOk(cudaMemcpy(scalar_ptr_, other.scalar_ptr_, mem_required,
+                                      cudaMemcpyDeviceToDevice));
+  }
+
+  return *this;
+}
+
+template<typename... ScalarTs>
 std::vector<PointCoord> CudaPointCloud<ScalarTs...>::GetHostPoints() const {
   std::vector<PointCoord> host_pts(pcl_size_);
   size_t mem_required = pcl_size_ * sizeof(PointCoord);

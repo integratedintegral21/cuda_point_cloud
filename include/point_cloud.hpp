@@ -28,8 +28,10 @@ class CudaPointCloud {
   explicit CudaPointCloud(const std::vector<PointCoord> &point_data) requires (!HAS_SCALARS_);
   CudaPointCloud(const std::vector<PointCoord> &point_data,
                  const std::vector<ScalarsT> &scalar_data) requires HAS_SCALARS_;
-
+  CudaPointCloud(const CudaPointCloud<ScalarTs...> &);
   ~CudaPointCloud();
+
+  CudaPointCloud<ScalarTs...>& operator=(const CudaPointCloud<ScalarTs...> &);
 
   // Getters
   [[nodiscard]] size_t Size() const {
