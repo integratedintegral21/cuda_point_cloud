@@ -255,6 +255,13 @@ TEST_F(PointCloudFixture, CopyTest) {
   for (size_t i = 0; i < pcl_size; i++) {
     ASSERT_EQ(copy_rgb[i], rgb[i]);
   }
+
+  pcl_rgb_copy = pcl_rgb;
+  ASSERT_EQ(pcl_size, pcl_rgb_copy.Size());
+  copy_rgb = pcl_rgb_copy.GetHostScalars();
+  for (size_t i = 0; i < pcl_size; i++) {
+    ASSERT_EQ(copy_rgb[i], rgb[i]);
+  }
 }
 
 TEST_F(PointCloudFixture, LargeTransformTest) {
