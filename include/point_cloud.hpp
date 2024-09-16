@@ -58,7 +58,7 @@ class CudaPointCloud {
     return scalar_ptr_;
   }
 
-  void Resize(size_t n);
+  void Resize(size_t n, bool realloc = true);
 
   /**
    * A bit slow, use for debugging only

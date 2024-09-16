@@ -111,12 +111,7 @@ TEST_F(PointCloudFixture, HostGettersTest) {
 
   auto host_rgb = pcl_rgb.GetHostScalars();
   for (size_t i = 0; i < pcl_size; i++) {
-    auto r = std::get<0>(host_rgb[i]);
-    auto g = std::get<1>(host_rgb[i]);
-    auto b = std::get<2>(host_rgb[i]);
-    ASSERT_EQ(r, std::get<0>(rgb[i]));
-    ASSERT_EQ(g, std::get<1>(rgb[i]));
-    ASSERT_EQ(b, std::get<2>(rgb[i]));
+    ASSERT_EQ(rgb[i], host_rgb[i]);
   }
 }
 
@@ -136,12 +131,7 @@ TEST_F(PointCloudFixture, ResizeTest) {
     ASSERT_EQ(pt.z, xyz[i].z);
   }
   for (size_t i = 0; i < pcl_size; i++) {
-    auto r = std::get<0>(host_rgb[i]);
-    auto g = std::get<1>(host_rgb[i]);
-    auto b = std::get<2>(host_rgb[i]);
-    ASSERT_EQ(r, std::get<0>(rgb[i]));
-    ASSERT_EQ(g, std::get<1>(rgb[i]));
-    ASSERT_EQ(b, std::get<2>(rgb[i]));
+    ASSERT_EQ(rgb[i], host_rgb[i]);
   }
 
   CudaPointCloudXYZRGB empty_pcl;

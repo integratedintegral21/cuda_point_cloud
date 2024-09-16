@@ -145,13 +145,21 @@ requires HAS_SCALARS_ {
 }
 
 template<typename... ScalarTs>
-void CudaPointCloud<ScalarTs...>::Resize(size_t n) {
+void CudaPointCloud<ScalarTs...>::Resize(size_t n, bool realloc) {
+  if (n == pcl_size_) {
+    return;
+  }
   if (pcl_size_ == 0) {  // No need to copy old data, just allocate
     cudaThrowIfStatusNotOk(cudaMalloc(reinterpret_cast<void **>(&xyz_ptr_),
                                       n * sizeof(PointCoord)));
     cudaThrowIfStatusNotOk(cudaMalloc(&scalar_ptr_, n * std::reduce(scalar_sizes_.begin(),
                                                                     scalar_sizes_.end())));
   }
+  if (n < pcl_size_ && !realloc) {
+    pcl_size_ = n;
+    return;
+  }
+
   PointCoord *xyz_copy;
   size_t new_n_bytes = n * sizeof(PointCoord);
   size_t curr_n_bytes = pcl_size_ * sizeof(PointCoord);

@@ -7,6 +7,7 @@
 #include <cuda_runtime_api.h>
 
 #define MAX_N_BLOCKS (1 << 16)  // 65536
+#define WARP_SIZE    32
 
 inline void cudaThrowIfStatusNotOk(cudaError_t e) {
   if (e) {
