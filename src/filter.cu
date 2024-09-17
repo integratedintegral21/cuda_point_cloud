@@ -33,34 +33,30 @@ __global__ void coord_filter_kernel(const PointCoord *in_pcl,
                                     size_t pcl_size,
                                     F &&f,
                                     size_t *partial_counts) {
-//  assert(pcl_size % 128 == 0);
-//  auto tb = cg::this_thread_block();
-//  auto filter_tile = cg::tiled_partition<128>(tb);  // One tile per block
+  assert(pcl_size % 128 == 0);
+  auto tb = cg::this_thread_block();
+  auto filter_tile = cg::tiled_partition<128>(tb);  // One tile per block
   size_t thread_id = blockDim.x * blockIdx.x + threadIdx.x;
-//  size_t n_threads = gridDim.x * blockDim.x;
-//
-//  __shared__ PointCoord local_chunk[128];
-//  __shared__ PointCoord local_result[128];
-//
-//  size_t n_batches = std::ceil((pcl_size - thread_id) / static_cast<float>(n_threads));
+  size_t n_threads = gridDim.x * blockDim.x;
 
-  if (threadIdx.x == 0) {
-    printf("%d\n", blockIdx.x);
-  }
-//
-//  for (size_t i = 0; i < n_batches; i++) {
-//    size_t global_idx = i * pcl_size + thread_id;
-//    local_chunk[threadIdx.x] = in_pcl[global_idx];
-//    filter_tile.sync();
-//
-//    size_t n_filtered = do_filter(filter_tile, local_chunk, local_result, f);
-//    filter_tile.sync();
-//
-//    partial_counts[blockIdx.x + i * blockDim.x] = n_filtered;
-//    out_pcl[global_idx] = local_result[threadIdx.x];
-//
-//    tb.sync();
-//  };
+  __shared__ PointCoord local_chunk[128];
+  __shared__ PointCoord local_result[128];
+
+  size_t n_batches = std::ceil((pcl_size - thread_id) / static_cast<float>(n_threads));
+
+  for (size_t i = 0; i < n_batches; i++) {
+    size_t global_idx = i * pcl_size + thread_id;
+    local_chunk[threadIdx.x] = in_pcl[global_idx];
+    filter_tile.sync();
+
+    size_t n_filtered = do_filter(filter_tile, local_chunk, local_result, f);
+    filter_tile.sync();
+
+    partial_counts[blockIdx.x + i * blockDim.x] = n_filtered;
+    out_pcl[global_idx] = local_result[threadIdx.x];
+
+    tb.sync();
+  };
 }
 
 template<typename ...ScalarTs>
@@ -90,18 +86,17 @@ void filter_by_coordinates(const CudaPointCloud<ScalarTs...> &in_pcl,
     return pt.x > 0 && pt.y > 0 && pt.z > 0;
   };
 
-  coord_filter_kernel<<<n_blocks, block_size>>>(
-      in_xyz,
-      out_xyz,
-      pcl_size,
-      gpu_fun,
-      partial_sums);
+  coord_filter_kernel<<<n_blocks, block_size>>>(in_xyz, out_xyz, pcl_size, gpu_fun, partial_sums);
 
   size_t *host_partial_sums = new size_t[desired_n_blocks];
-  cudaThrowIfStatusNotOk(cudaMemcpy(host_partial_sums, partial_sums, desired_n_blocks, cudaMemcpyDeviceToHost));
+  cudaThrowIfStatusNotOk(cudaMemcpy(host_partial_sums, partial_sums,
+                                    desired_n_blocks * sizeof(size_t),
+                                    cudaMemcpyDeviceToHost));
+  std::cout << "Partial sums: " << std::endl;
   for (size_t i = 0; i < desired_n_blocks; i++) {
     std::cout << host_partial_sums[i] << std::endl;
   }
+  delete[] host_partial_sums;
 }
 
 INSTANTIATE_FILTER()
