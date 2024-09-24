@@ -59,6 +59,28 @@ __global__ void coord_filter_kernel(const PointCoord *in_pcl,
   };
 }
 
+__global__ void write_filtered_points(PointCoord *filtered_pcl,
+                                      PointCoord *out_pcl,
+                                      size_t filtered_pcl_size,
+                                      size_t *prefix_sum) {
+  size_t thread_id = blockDim.x * blockIdx.x + threadIdx.x;
+  size_t n_threads = gridDim.x * blockDim.x;
+
+  size_t n_batches = std::ceil((filtered_pcl_size - thread_id) / static_cast<float>(n_threads));
+
+  for (size_t i = 0; i < n_batches; i++) {
+    size_t global_idx = i * filtered_pcl_size + thread_id;
+
+    size_t pcl_chunk_idx = global_idx / blockDim.x;
+    size_t this_start_idx = pcl_chunk_idx == 0 ? 0 : prefix_sum[pcl_chunk_idx - 1];
+    size_t this_n_points = prefix_sum[pcl_chunk_idx] - this_start_idx;
+
+    if (threadIdx.x < this_n_points) {
+      out_pcl[this_start_idx + threadIdx.x] = filtered_pcl[global_idx];
+    }
+  }
+}
+
 template<typename ...ScalarTs>
 void filter_by_coordinates(const CudaPointCloud<ScalarTs...> &in_pcl,
                            CudaPointCloud<ScalarTs...> &out_pcl,
@@ -72,7 +94,11 @@ void filter_by_coordinates(const CudaPointCloud<ScalarTs...> &in_pcl,
     out_pcl.Resize(pcl_size);
   }
 
+  CudaPointCloud<ScalarTs...> placeholder_pcl;
+  placeholder_pcl.Resize(pcl_size);
+
   const PointCoord *in_xyz = in_pcl.PointCoordDevPtr();
+  PointCoord *placeholder_xyz = placeholder_pcl.PointCoordDevPtr();
   PointCoord *out_xyz = out_pcl.PointCoordDevPtr();
 
   size_t block_size = 128;
@@ -86,16 +112,29 @@ void filter_by_coordinates(const CudaPointCloud<ScalarTs...> &in_pcl,
     return pt.x > 0 && pt.y > 0 && pt.z > 0;
   };
 
-  coord_filter_kernel<<<n_blocks, block_size>>>(in_xyz, out_xyz, pcl_size, gpu_fun, partial_sums);
+  coord_filter_kernel<<<n_blocks, block_size>>>(in_xyz, placeholder_xyz, pcl_size, gpu_fun,
+                                                partial_sums);
 
+  // TODO: do it with CUDA
   size_t *host_partial_sums = new size_t[desired_n_blocks];
   cudaThrowIfStatusNotOk(cudaMemcpy(host_partial_sums, partial_sums,
                                     desired_n_blocks * sizeof(size_t),
                                     cudaMemcpyDeviceToHost));
-  std::cout << "Partial sums: " << std::endl;
-  for (size_t i = 0; i < desired_n_blocks; i++) {
-    std::cout << host_partial_sums[i] << std::endl;
+  for (size_t i = 1; i < desired_n_blocks; i++) {
+    host_partial_sums[i] += host_partial_sums[i - 1];
   }
+  size_t out_size = host_partial_sums[desired_n_blocks - 1];
+  cudaThrowIfStatusNotOk(cudaMemcpy(partial_sums, host_partial_sums,
+                                    desired_n_blocks * sizeof(size_t),
+                                    cudaMemcpyHostToDevice));
+
+  write_filtered_points<<<n_blocks, block_size>>>(placeholder_xyz, out_xyz, pcl_size, partial_sums);
+  out_pcl.Resize(out_size);
+  auto host_out_xyz = out_pcl.GetHostPoints();
+//  for (size_t i = 0; i < out_size; i++) {
+//    std::cout << "Point " << i << ": " << host_out_xyz[i].x << ", " << host_out_xyz[i].y << ", " << host_out_xyz[i].z << std::endl;
+//  }
+
   delete[] host_partial_sums;
 }
 
